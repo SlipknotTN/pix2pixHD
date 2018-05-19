@@ -59,11 +59,16 @@ class BaseModel(torch.nn.Module):
             if network_label == 'G':
                 raise('Generator must exist!')
         else:
-            #network.load_state_dict(torch.load(save_path))
             try:
-                network.load_state_dict(torch.load(save_path))
-            except:   
-                pretrained_dict = torch.load(save_path)                
+                if self.gpu_ids and torch.cuda.is_available():
+                    network.load_state_dict(torch.load(save_path))
+                else:
+                    network.load_state_dict(torch.load(save_path, map_location=lambda storage, loc: storage))
+            except:
+                if self.gpu_ids and torch.cuda.is_available():
+                    pretrained_dict = torch.load(save_path)
+                else:
+                    pretrained_dict = torch.load(save_path, map_location=lambda storage, loc: storage)
                 model_dict = network.state_dict()
                 try:
                     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}                    

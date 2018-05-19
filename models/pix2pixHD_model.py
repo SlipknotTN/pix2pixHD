@@ -96,30 +96,46 @@ class Pix2PixHDModel(BaseModel):
 
     def encode_input(self, label_map, inst_map=None, real_image=None, feat_map=None, infer=False):             
         if self.opt.label_nc == 0:
-            input_label = label_map.data.cuda()
+            if self.gpu_ids and torch.cuda.is_available():
+                input_label = label_map.data.cuda()
+            else:
+                input_label = label_map.data.cpu()
         else:
             # create one-hot vector for label map 
             size = label_map.size()
             oneHot_size = (size[0], self.opt.label_nc, size[2], size[3])
-            input_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
-            input_label = input_label.scatter_(1, label_map.data.long().cuda(), 1.0)
+            if self.gpu_ids and torch.cuda.is_available():
+                input_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
+                input_label = input_label.scatter_(1, label_map.data.long().cuda(), 1.0)
+            else:
+                input_label = torch.FloatTensor(torch.Size(oneHot_size)).zero_().cpu()
+                input_label = input_label.scatter_(1, label_map.data.long().cpu(), 1.0)
 
         # get edges from instance map
         if not self.opt.no_instance:
-            inst_map = inst_map.data.cuda()
+            if self.gpu_ids and torch.cuda.is_available():
+                inst_map = inst_map.data.cuda()
+            else:
+                inst_map = inst_map.data.cpu()
             edge_map = self.get_edges(inst_map)
             input_label = torch.cat((input_label, edge_map), dim=1) 
         input_label = Variable(input_label, volatile=infer)
 
         # real images for training
         if real_image is not None:
-            real_image = Variable(real_image.data.cuda())
+            if self.gpu_ids and torch.cuda.is_available():
+                real_image = Variable(real_image.data.cuda())
+            else:
+                real_image = Variable(real_image.data.cpu())
 
         # instance map for feature encoding
         if self.use_features:
             # get precomputed feature maps
             if self.opt.load_features:
-                feat_map = Variable(feat_map.data.cuda())
+                if self.gpu_ids and torch.cuda.is_available():
+                    feat_map = Variable(feat_map.data.cuda())
+                else:
+                    feat_map = Variable(feat_map.data.cpu())
 
         return input_label, inst_map, real_image, feat_map
 
@@ -230,7 +246,10 @@ class Pix2PixHDModel(BaseModel):
         return feature
 
     def get_edges(self, t):
-        edge = torch.cuda.ByteTensor(t.size()).zero_()
+        if self.gpu_ids and torch.cuda.is_available():
+            edge = torch.cuda.ByteTensor(t.size()).zero_()
+        else:
+            edge = torch.ByteTensor(t.size()).zero_()
         edge[:,:,:,1:] = edge[:,:,:,1:] | (t[:,:,:,1:] != t[:,:,:,:-1])
         edge[:,:,:,:-1] = edge[:,:,:,:-1] | (t[:,:,:,1:] != t[:,:,:,:-1])
         edge[:,:,1:,:] = edge[:,:,1:,:] | (t[:,:,1:,:] != t[:,:,:-1,:])
