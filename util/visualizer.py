@@ -31,6 +31,7 @@ class Visualizer():
             print('create web directory %s...' % self.web_dir)
             util.mkdirs([self.web_dir, self.img_dir])
         self.log_name = os.path.join(opt.log_dir, opt.name, 'loss_log.txt')
+        os.makedirs(os.path.join(opt.log_dir, opt.name), exist_ok=True)
         with open(self.log_name, "a") as log_file:
             now = time.strftime("%c")
             log_file.write('================ Training Loss (%s) ================\n' % now)
